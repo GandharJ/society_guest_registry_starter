@@ -1,12 +1,13 @@
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
-class RegisterIn(BaseModel):
+class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     email: EmailStr
     password: str = Field(min_length=10, max_length=128)
     role: str
     flat_number: str | None = None
+    society_id: int | None = None
 
 class LoginIn(BaseModel):
     email: EmailStr
@@ -15,6 +16,29 @@ class LoginIn(BaseModel):
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    role: str
+    name: str
+    flat_number: str | None = None
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
+    role: str
+    flat_number: str | None
+    society_id: int | None
+    model_config = ConfigDict(from_attributes=True)
+
+class SocietyCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    address: str | None = None
+
+class BuildingCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+
+class FlatCreate(BaseModel):
+    building_id: int
+    flat_number: str = Field(min_length=1, max_length=30)
 
 class VisitorCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)

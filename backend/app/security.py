@@ -21,11 +21,9 @@ def create_token(user: User) -> str:
     return jwt.encode({"sub": str(user.id), "role": user.role, "exp": expires},
                       settings.SECRET_KEY, algorithm="HS256")
 
-def current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
-    db: Session = Depends(get_db)
-) -> User:
-    error = HTTPException(status_code=401, detail="Invalid or expired authentication token")
+def current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer),
+                 db: Session = Depends(get_db)) -> User:
+    error = HTTPException(401, "Invalid or expired authentication token")
     try:
         payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=["HS256"])
         user_id = int(payload.get("sub", ""))
@@ -39,6 +37,6 @@ def current_user(
 def require_roles(*roles):
     def dependency(user: User = Depends(current_user)):
         if user.role not in roles:
-            raise HTTPException(status_code=403, detail="You do not have permission")
+            raise HTTPException(403, "You do not have permission")
         return user
     return dependency

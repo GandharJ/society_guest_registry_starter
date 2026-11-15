@@ -1,114 +1,82 @@
-# Society Guest Registry — starter project
+# Society Guest Registry — role-based mobile starter
 
-A mobile-first visitor management system scaffold:
-- Flutter mobile client (Android/iOS)
-- Python FastAPI REST backend
+## Stack
+- Flutter mobile app (Android/iOS)
+- Python FastAPI backend
 - PostgreSQL database
-- JWT authentication foundation
-- Visitor registration, approval, check-in and check-out API foundations
+- JWT authentication; role-based access: admin, guard, resident
+- Flutter secure storage for saved login token
 
-## Architecture
-
-Flutter app -> HTTPS/REST -> FastAPI -> PostgreSQL
-                                      -> Firebase Cloud Messaging (planned integration)
-
-## Project structure
-
-```text
-society_guest_registry/
-  backend/
-    app/
-      main.py
-      database.py
-      models.py
-      schemas.py
-      security.py
-    requirements.txt
-    .env.example
-    Dockerfile
-  mobile/
-    pubspec.yaml
-    lib/main.dart
-  docker-compose.yml
-```
-
-## 1. Start PostgreSQL and the API
-
-Install Docker Desktop, then from this folder:
+## Start backend
+Install Docker Desktop. Copy `backend/.env.example` to `backend/.env`, replace
+`SECRET_KEY` with a long random secret, then run:
 
 ```bash
 docker compose up --build
 ```
 
-API documentation: http://localhost:8000/docs
+API docs: http://localhost:8000/docs
 
-The backend creates database tables on startup. This is a development scaffold;
-use Alembic migrations before production deployment.
+## Create accounts
+The first account is created once using `POST /auth/register` with role `admin`.
+After that, public registration is closed. Admin creates guard/resident accounts
+using `POST /admin/users`. Resident accounts require `flat_number`.
 
-## 2. Create the first administrator
+Login at `/auth/login`. The Flutter app uses the returned role to show the
+appropriate home screen.
 
-For this starter, create an admin account using the API's `/auth/register` endpoint.
-For a real deployment, disable public registration and create users through a
-restricted admin invitation workflow.
-
-Example request:
-
-```json
-{
-  "name": "Society Admin",
-  "email": "admin@example.com",
-  "password": "ChangeThis-StrongPassword",
-  "role": "admin",
-  "flat_number": null
-}
-```
-
-Then use `/auth/login` to obtain a bearer token. In Swagger UI, click **Authorize**
-and enter the token as `Bearer <token>`.
-
-Roles: `admin`, `guard`, `resident`.
-
-## 3. API workflow
-
-1. Admin creates resident and guard accounts (registration is open only in this
-   development starter; lock it down before deployment).
-2. Guard creates a visitor record with `POST /visitors`.
-3. Resident approves/rejects with `POST /visitors/{id}/decision`.
-4. Guard records entry with `POST /visitors/{id}/check-in`.
-5. Guard records exit with `POST /visitors/{id}/check-out`.
-6. Admin/guard can list visit records with `GET /visitors`.
-
-All visitor endpoints require a JWT. The starter includes role checks for
-approval and gate operations; extend flat-level authorization before production.
-
-## 4. Run the Flutter app
-
-Install Flutter SDK, then:
-
+## Run mobile app
 ```bash
 cd mobile
 flutter pub get
 flutter run
 ```
+Android emulator API URL defaults to `http://10.0.2.2:8000`.
+For iOS simulator use `--dart-define=API_BASE_URL=http://127.0.0.1:8000`.
+For a physical phone, use your computer's LAN IP and ensure both devices share
+the same network. Use HTTPS outside local development.
 
-For Android emulator use `http://10.0.2.2:8000`; for iOS simulator use
-`http://127.0.0.1:8000`. A physical phone must use your computer's LAN IP,
-and the API must be reachable on that network.
+## Implemented
+- Role-based login and session restoration
+- Guard/admin visitor registration
+- Resident approval/rejection
+- Guard/admin check-in and check-out
+- Role-filtered resident visitor list
+- Dashboard summary API
 
-The included Flutter screen is a connectivity/dashboard starter. The next
-implementation stage is role-based login, visitor form, approval inbox,
-QR scanning and push notifications.
+## Still to build
+QR pass generation and secure one-time validation, FCM push notifications,
+admin user-management screens, audit log, photo storage, analytics/export,
+automated tests and production deployment.
 
-## Production checklist
+## Production requirements
+This is a development starter, not production-ready. Add Alembic migrations,
+strict society-level tenancy, rate limiting, HTTPS, secret rotation, backups,
+audit logging, consent and retention policies, and a reviewed privacy/security
+design before collecting real visitor data. QR codes must contain signed,
+short-lived opaque tokens—not personal information.
 
-- Enforce HTTPS and secure secret management; rotate `SECRET_KEY`.
-- Close public registration; use admin-created invitations.
-- Add per-society tenancy and strict flat-level authorization.
-- Add Alembic migrations, backups, monitoring and rate limiting.
-- Store visitor photos in private object storage, not public URLs.
-- Add consent/notice, retention limits and deletion procedures for personal data.
-- Use signed, short-lived, single-use QR tokens; never encode personal details in QR.
-- Integrate Firebase Admin SDK for push notifications.
-- Add audit events for approvals, edits and check-in/check-out.
-- Obtain society approval and review applicable Indian privacy requirements
-  before collecting visitor personal data.
+
+## Version 0.3 additions
+- Society, building and flat tables
+- Admin endpoints to create society structure and user accounts
+- Society-scoped visitor listing and dashboard queries
+- Opaque QR tokens: raw token returned once; only SHA-256 hash stored
+- QR pass expiry (12 hours) and single-use gate scan endpoint
+- CSV visitor report endpoint
+
+## New API sequence
+1. Bootstrap the first admin with `POST /auth/register`.
+2. Create a society using `POST /admin/societies`.
+3. Assign the admin to that society in the database (initial setup step).
+4. Create buildings with `POST /admin/buildings`, then flats with `POST /admin/flats`.
+5. Create guard/resident accounts using `POST /admin/users`.
+6. Issue a pass with `POST /visitors/{id}/qr-pass`; render returned `qr_token` as QR.
+7. Gate app submits scanned token to `POST /gate/scan/{qr_token}`.
+8. Download `GET /reports/visitors.csv`.
+
+**Important:** FCM push delivery and native QR camera scanning are integration
+tasks, not yet wired into this scaffold. The backend endpoints and secure token
+lifecycle are present. Admin-to-society assignment needs a controlled setup
+endpoint or seed script before ordinary admin use. This remains a development
+scaffold; add migrations, tests, strict tenant checks and deployment hardening.
