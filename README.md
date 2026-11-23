@@ -9,7 +9,8 @@
 
 ## Start backend
 Install Docker Desktop. Copy `backend/.env.example` to `backend/.env`, replace
-`SECRET_KEY` with a long random secret, then run:
+`SECRET_KEY` with a long random secret (for example `openssl rand -hex 32`). The
+`.env` file is git-ignored, so keep it out of commits. Then run:
 
 ```bash
 docker compose up --build
@@ -25,9 +26,23 @@ using `POST /admin/users`. Resident accounts require `flat_number`.
 Login at `/auth/login`. The Flutter app uses the returned role to show the
 appropriate home screen.
 
+**Quick dev data (optional):** instead of calling the endpoints by hand, seed a demo
+society with an admin, guard and resident (`admin@example.com`, `guard@example.com`,
+`resident@example.com`, flat `A-101`) sharing one password you choose:
+
+```bash
+docker compose exec -e SEED_PASSWORD='choose-a-long-dev-password' api python -m app.seed
+```
+
+Development only. Never use shared seeded passwords in a real deployment.
+
 ## Run mobile app
+The repo ships only `lib/` and `pubspec.yaml`. Generate the Android/iOS project
+folders once (this keeps the existing `lib/` and `pubspec.yaml`):
+
 ```bash
 cd mobile
+flutter create . --project-name society_guest_registry --platforms=android,ios
 flutter pub get
 flutter run
 ```
@@ -67,16 +82,36 @@ short-lived opaque tokens—not personal information.
 
 ## New API sequence
 1. Bootstrap the first admin with `POST /auth/register`.
-2. Create a society using `POST /admin/societies`.
-3. Assign the admin to that society in the database (initial setup step).
-4. Create buildings with `POST /admin/buildings`, then flats with `POST /admin/flats`.
-5. Create guard/resident accounts using `POST /admin/users`.
-6. Issue a pass with `POST /visitors/{id}/qr-pass`; render returned `qr_token` as QR.
-7. Gate app submits scanned token to `POST /gate/scan/{qr_token}`.
-8. Download `GET /reports/visitors.csv`.
+2. Create a society using `POST /admin/societies`. This links the admin to the new
+   society automatically (an admin manages one society; a second call returns 409).
+3. Create buildings with `POST /admin/buildings`, then flats with `POST /admin/flats`.
+4. Create guard/resident accounts using `POST /admin/users`.
+5. Issue a pass with `POST /visitors/{id}/qr-pass`; render returned `qr_token` as QR.
+6. Gate app submits scanned token to `POST /gate/scan/{qr_token}`.
+7. Download `GET /reports/visitors.csv`.
 
 **Important:** FCM push delivery and native QR camera scanning are integration
 tasks, not yet wired into this scaffold. The backend endpoints and secure token
-lifecycle are present. Admin-to-society assignment needs a controlled setup
-endpoint or seed script before ordinary admin use. This remains a development
-scaffold; add migrations, tests, strict tenant checks and deployment hardening.
+lifecycle are present. This remains a development scaffold; add migrations, tests,
+strict tenant checks and deployment hardening.
+
+
+## Tests
+Backend tests run against an in-memory SQLite database (no Docker needed):
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
+
+They cover auth, role checks, society isolation, the visitor approval flow,
+single-use/expiring QR passes and CSV export.
+
+## Hardening in this release
+- Visitor and resident flat numbers must exist in the society's flat list.
+- Society-scoped endpoints reject accounts not linked to a society (no `IS NULL` leaks).
+- QR scan is atomic single-use; issuing a new pass or checking in manually voids older open passes.
+- Emails are case-insensitive; CSV export neutralises spreadsheet formula injection
+  (text starting with `= + - @` is prefixed with `'`).
+- `bcrypt<5` pinned because passlib 1.7 breaks with bcrypt 5.

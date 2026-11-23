@@ -1,0 +1,26 @@
+# Secrets: copy backend/.env.example to backend/.env locally; never commit it
+.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/build/
+mobile/pubspec.lock
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/Pods/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
