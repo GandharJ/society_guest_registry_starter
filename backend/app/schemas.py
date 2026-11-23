@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
 class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
@@ -9,9 +9,19 @@ class UserCreate(BaseModel):
     flat_number: str | None = None
     society_id: int | None = None
 
+    @field_validator("email", mode="after")
+    @classmethod
+    def _lower_email(cls, v):
+        return v.lower()
+
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+    @field_validator("email", mode="after")
+    @classmethod
+    def _lower_email(cls, v):
+        return v.lower()
 
 class TokenOut(BaseModel):
     access_token: str

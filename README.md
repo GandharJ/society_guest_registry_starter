@@ -94,3 +94,24 @@ short-lived opaque tokens—not personal information.
 tasks, not yet wired into this scaffold. The backend endpoints and secure token
 lifecycle are present. This remains a development scaffold; add migrations, tests,
 strict tenant checks and deployment hardening.
+
+
+## Tests
+Backend tests run against an in-memory SQLite database (no Docker needed):
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest
+```
+
+They cover auth, role checks, society isolation, the visitor approval flow,
+single-use/expiring QR passes and CSV export.
+
+## Hardening in this release
+- Visitor and resident flat numbers must exist in the society's flat list.
+- Society-scoped endpoints reject accounts not linked to a society (no `IS NULL` leaks).
+- QR scan is atomic single-use; issuing a new pass or checking in manually voids older open passes.
+- Emails are case-insensitive; CSV export neutralises spreadsheet formula injection
+  (text starting with `= + - @` is prefixed with `'`).
+- `bcrypt<5` pinned because passlib 1.7 breaks with bcrypt 5.
