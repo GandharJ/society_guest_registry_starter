@@ -51,8 +51,14 @@ def me(user: User = Depends(current_user)):
 @app.post("/admin/societies", status_code=201)
 def create_society(data: SocietyCreate, db: Session = Depends(get_db),
                    admin: User = Depends(require_roles("admin"))):
+    # An admin manages exactly one society. Creating a society links the admin to it,
+    # so the building/flat/user endpoints below work without manual database edits.
+    if admin.society_id:
+        raise HTTPException(409, "Your account is already linked to a society.")
     society = Society(name=data.name, address=data.address)
-    db.add(society); db.commit(); db.refresh(society)
+    db.add(society); db.flush()
+    admin.society_id = society.id
+    db.commit(); db.refresh(society)
     return {"id": society.id, "name": society.name, "address": society.address}
 
 @app.post("/admin/buildings", status_code=201)
@@ -87,6 +93,8 @@ def create_user(data: UserCreate, db: Session = Depends(get_db),
         raise HTTPException(400, "Residents must have a flat number.")
     if db.scalar(select(User).where(User.email == data.email)):
         raise HTTPException(409, "Email already registered.")
+    if not admin.society_id:
+        raise HTTPException(400, "Create your society first (POST /admin/societies).")
     society_id = admin.society_id
     user = User(name=data.name, email=data.email, password_hash=hash_password(data.password),
                 role=data.role, flat_number=data.flat_number if data.role == "resident" else None,
@@ -101,6 +109,8 @@ def list_users(db: Session = Depends(get_db), admin: User = Depends(require_role
 @app.post("/visitors", response_model=VisitorOut, status_code=201)
 def create_visitor(data: VisitorCreate, db: Session = Depends(get_db),
                    user: User = Depends(require_roles("guard", "admin"))):
+    if not user.society_id:
+        raise HTTPException(400, "Your account is not linked to a society yet.")
     visit = Visitor(**data.model_dump(), created_by=user.id, status="pending",
                     society_id=user.society_id)
     db.add(visit); db.commit(); db.refresh(visit)
